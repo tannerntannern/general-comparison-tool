@@ -19,5 +19,8 @@ jobs:
       - name: Build
         run: yarn build
       - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.ref == 'refs/heads/main' }}
-        run: echo "This would deploy"
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
