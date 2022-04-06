@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "lib": ["es6", "dom"],
+        "strict": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "jsx": "preserve",
+        "jsxFactory": "createElement",
+        "jsxFragmentFactory": "Fragment"
+    },
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.tsx"
+    ]
+}
