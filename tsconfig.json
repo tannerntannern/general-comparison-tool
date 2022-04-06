@@ -1,6 +1,7 @@
 {
     "compilerOptions": {
         "lib": ["es6", "dom"],
+        "skipLibCheck": true,
         "strict": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,

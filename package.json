@@ -1,6 +1,7 @@
 {
     "private": true,
     "scripts": {
+        "test": "tsc --noEmit",
         "dev": "esbuild src/index.tsx --servedir=src --bundle --inject:./react-shim.js",
         "build": "rimraf dist && mkdir dist && cpy --flat src/index.html dist && esbuild src/index.tsx --bundle --minify --outdir=dist --inject:./react-shim.js"
     },

@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
   deploy:
@@ -11,5 +12,12 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
     steps:
       - uses: actions/checkout@v3
+      - name: Install
+        run: yarn install
+      - name: Test
+        run: yarn test
       - name: Build
-        run: yarn install && yarn build
+        run: yarn build
+      - name: Deploy
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: echo "This would deploy"
