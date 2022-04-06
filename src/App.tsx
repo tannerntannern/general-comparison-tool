@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Accordion, AccordionDetails, AccordionSummary, Button, Checkbox, Container, CssBaseline, FormControlLabel, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Button, Checkbox, Container, CssBaseline, FormControlLabel, Grid, MenuItem, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import GitHubIcon from '@mui/icons-material/GitHub';
 import { StrictMode } from 'react';
 import { useLocalStorage } from 'react-use';
 
@@ -50,9 +51,16 @@ export default function App() {
 
     return (
         <AppProviders>
-            <Container>
-                <Typography variant="h5" marginY="0.5em">General-Purpose Comparison Tool</Typography>
-                <TableContainer component={Paper} sx={{ marginBottom: '1em' }}>
+            <Container style={{ marginTop: '1em', marginBottom: '1em' }}>
+                <Grid container>
+                    <Grid item flexGrow={1}>
+                        <Typography variant="h5">General-Purpose Comparison Tool (work in progress)</Typography>
+                    </Grid>
+                    <Grid item>
+                        <a href="https://github.com/tannerntannern/general-comparison-tool" target="_blank"><GitHubIcon/></a>
+                    </Grid>
+                </Grid>
+                <TableContainer component={Paper} sx={{ marginY: '1em' }}>
                     <Table size="small">
                         <TableHead>
                             <TableRow>
