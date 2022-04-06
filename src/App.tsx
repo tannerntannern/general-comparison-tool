@@ -61,7 +61,7 @@ export default function App() {
                     </Grid>
                 </Grid>
                 <TableContainer component={Paper} sx={{ marginY: '1em' }}>
-                    <Table size="small">
+                    <Table size="small" stickyHeader>
                         <TableHead>
                             <TableRow>
                                 <TableCell></TableCell>
@@ -151,65 +151,67 @@ function MetricsTable(props: { metrics: Metric[], setMetrics: (newMetrics: Metri
     }
 
     return (<>
-        <Table size="small">
-            <TableHead>
-                <TableRow>
-                    <TableCell>Metric Name</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Relative Importance</TableCell>
-                    <TableCell>Other</TableCell>
-                    <TableCell>Actions</TableCell>
-                </TableRow>
-            </TableHead>
-            <TableBody>
-                {props.metrics.map((metric, i) => (
-                    <TableRow key={i}>
-                        <TableCell>
-                            <TextField
-                                size="small"
-                                value={metric.name}
-                                onChange={e => updateMetric(i, { ...metric, name: e.target.value })}/>
-                        </TableCell>
-                        <TableCell>
-                            <TextField
-                                size="small"
-                                select
-                                value={metric.type}
-                                onChange={e => updateMetricType(i, e.target.value as any)}>
-                                {(Object.keys(typeLabels) as Array<keyof typeof typeLabels>).map(key => (
-                                    <MenuItem key={key} value={key}>{typeLabels[key]}</MenuItem>
-                                ))}
-                            </TextField>
-                        </TableCell>
-                        <TableCell>
-                            <TextField
-                                size="small"
-                                value={metric.relativeImportance}
-                                onChange={e => updateMetric(i, { ...metric, relativeImportance: parseFloat(e.target.value) })}
-                                InputProps={{ type: 'number' }}/>
-                        </TableCell>
-                        <TableCell>
-                            {metric.type === 'boolean' ? (
-                                <FormControlLabel label="True is better" control={
-                                    <Checkbox checked={metric.trueIsBetter} onChange={e => updateMetric(i, { ...metric, trueIsBetter: e.target.checked })}/>
-                                }/>
-                            ) : metric.type === 'numeric' ? (
-                                <FormControlLabel label="Higher is better" control={
-                                    <Checkbox checked={metric.higherIsBetter} onChange={e => updateMetric(i, { ...metric, higherIsBetter: e.target.checked })}/>
-                                }/>
-                            ) : (
-                                'N/A'
-                            )}
-                        </TableCell>
-                        <TableCell>
-                            <Button color="error" onClick={() => deleteMetric(i)}>
-                                Delete
-                            </Button>
-                        </TableCell>
+        <TableContainer>
+            <Table size="small" stickyHeader>
+                <TableHead>
+                    <TableRow>
+                        <TableCell>Metric Name</TableCell>
+                        <TableCell>Type</TableCell>
+                        <TableCell>Relative Importance</TableCell>
+                        <TableCell>Interpretation</TableCell>
+                        <TableCell>Actions</TableCell>
                     </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+                </TableHead>
+                <TableBody>
+                    {props.metrics.map((metric, i) => (
+                        <TableRow key={i}>
+                            <TableCell style={{ minWidth: '12em' }}>
+                                <TextField
+                                    size="small"
+                                    value={metric.name}
+                                    onChange={e => updateMetric(i, { ...metric, name: e.target.value })}/>
+                            </TableCell>
+                            <TableCell>
+                                <TextField
+                                    size="small"
+                                    select
+                                    value={metric.type}
+                                    onChange={e => updateMetricType(i, e.target.value as any)}>
+                                    {(Object.keys(typeLabels) as Array<keyof typeof typeLabels>).map(key => (
+                                        <MenuItem key={key} value={key}>{typeLabels[key]}</MenuItem>
+                                    ))}
+                                </TextField>
+                            </TableCell>
+                            <TableCell>
+                                <TextField
+                                    size="small"
+                                    value={metric.relativeImportance}
+                                    onChange={e => updateMetric(i, { ...metric, relativeImportance: parseFloat(e.target.value) })}
+                                    InputProps={{ type: 'number' }}/>
+                            </TableCell>
+                            <TableCell>
+                                {metric.type === 'boolean' ? (
+                                    <FormControlLabel label="True is better" control={
+                                        <Checkbox checked={metric.trueIsBetter} onChange={e => updateMetric(i, { ...metric, trueIsBetter: e.target.checked })}/>
+                                    }/>
+                                ) : metric.type === 'numeric' ? (
+                                    <FormControlLabel label="Higher is better" control={
+                                        <Checkbox checked={metric.higherIsBetter} onChange={e => updateMetric(i, { ...metric, higherIsBetter: e.target.checked })}/>
+                                    }/>
+                                ) : (
+                                    'N/A'
+                                )}
+                            </TableCell>
+                            <TableCell>
+                                <Button color="error" onClick={() => deleteMetric(i)}>
+                                    Delete
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
         <Button style={{ marginTop: '1em' }} onClick={() => props.setMetrics([...props.metrics, defaultMetrics.numeric(props.metrics)])}>
             New Metric
         </Button>
