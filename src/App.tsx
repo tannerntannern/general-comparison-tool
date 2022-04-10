@@ -172,7 +172,7 @@ export default function App() {
                 <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: '1em' }}>
                     <Tabs value={selectedTab} onChange={(ev, val) => setSelectedTab(val!)}>
                         {tabs.map(tab => (
-                            <Tab label={tab} value={tab}/>
+                            <Tab key={tab} label={tab} value={tab}/>
                         ))}
                     </Tabs>
                 </Box>
