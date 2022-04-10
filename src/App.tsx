@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Accordion, AccordionDetails, AccordionSummary, Button, Checkbox, Container, CssBaseline, FormControlLabel, Grid, IconButton, MenuItem, Paper, Rating, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useMemo, useState } from 'react';
+import { Box, Button, Card, CardContent, CardMedia, Checkbox, Container, CssBaseline, FormControlLabel, Grid, IconButton, MenuItem, Paper, Rating, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Tooltip, Typography } from '@mui/material';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,7 +12,9 @@ import { StrictMode } from 'react';
 import { useLocalStorage } from 'react-use';
 
 export default function App() {
-    const [metricsTableOpen, setMetricsTableOpen] = useLocalStorage<boolean>('metricsTableOpen', true);
+    const tabs = ["Metric Definitions", "Data Entry", "Results View"] as const;
+    const [selectedTab, setSelectedTab] = useLocalStorage('tabState', tabs[0] as typeof tabs[number]);
+
     const [comparables, setComparables] = useLocalStorage<Comparable[]>('comparables', [
         { name: 'Apartment 1' },
         { name: 'Apartment 2' },
@@ -22,15 +23,50 @@ export default function App() {
         false,
         false,
     ]);
+
     const [metrics, setMetrics] = useLocalStorage<Metric[]>('metrics', [
         { type: 'numeric', name: 'Rent', relativeImportance: 1, higherIsBetter: false },
         { type: 'numeric', name: 'Square Footage', relativeImportance: 1, higherIsBetter: true },
         { type: 'boolean', name: 'Has Parking', relativeImportance: 1, trueIsBetter: true },
     ]);
+
     const [metricData, setMetricData] = useLocalStorage<MetricRating[][]>('metricData', [
         [1400, 760, true],
         [1200, 700, false],
     ]);
+
+    const results = useMemo<[Comparable, number][]>(() => {
+        const numericAverages = metrics!.map((metric, i) => {
+            if (metric.type !== 'numeric')
+                return null;
+            return metricData!.reduce((acc, next) => acc + (next[i] as number), 0) / metricData!.length;
+        });
+
+        const scores = metricData!
+            .map(row => {
+                return metrics!
+                    .map((metric, i) => {
+                        const rating = row[i];
+                        if (metric.type === 'boolean')
+                            return metric.relativeImportance * (!!rating === metric.trueIsBetter ? 1 : 0);
+                        if (metric.type === 'five-star')
+                            return metric.relativeImportance * ((rating as number) / 5);
+                        if (metric.type === 'numeric')
+                            // TODO: divide by zero errors
+                            return metric.higherIsBetter
+                                ? metric.relativeImportance * (rating as number / numericAverages[i]!)
+                                : metric.relativeImportance * (numericAverages[i]! / (rating as number));
+                        
+                        // @ts-ignore: all cases are covered currently, but might not be if new metric type is added
+                        throw new Error(`Unsupported metric type "${metric.type}"`);
+                    })
+                    .reduce((a, b) => a + b, 0);
+            });
+        
+        return scores
+            .map((score, i) => [comparables![i], score] as [Comparable, number])
+            .sort((a, b) => b[1] - a[1]);
+    }, [comparables, metrics, metricData]);
 
     function addComparable() {
         setComparables([...comparables!, { name: `Item ${comparables!.length + 1}` }]);
@@ -133,198 +169,224 @@ export default function App() {
                         <a href="https://github.com/tannerntannern/general-comparison-tool" target="_blank"><GitHubIcon/></a>
                     </Grid>
                 </Grid>
-                <TableContainer component={Paper} sx={{ marginY: '1em' }}>
-                    <Table size="small" stickyHeader>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell></TableCell>
-                                {comparables!.map((comparable, i) => (
-                                    <TableCell key={i}>
-                                        <Grid container spacing={1} flexDirection="column">
-                                            <Grid item container alignItems="center">
-                                                <Grid item>
-                                                    {!comparableEditMode[i] ? (
-                                                        <a href={comparable.url} target="_blank">
-                                                            <Typography fontWeight="bold">
-                                                                {comparable.name}
-                                                            </Typography>
-                                                        </a>
-                                                    ) : (
-                                                        <TextField
-                                                            size="small"
-                                                            label="Name"
-                                                            value={comparable.name}
-                                                            onChange={e => patchComparable(i, { name: e.target.value })}/>
-                                                    )}
-                                                </Grid>
-                                                <Grid item>
-                                                    <Tooltip title={comparableEditMode[i] ? 'Done editing' : 'Edit'}>
-                                                        <IconButton size="small" onClick={() => patchComparableEditMode(i, !comparableEditMode[i])}>
-                                                            {comparableEditMode[i] ? <CheckIcon/> : <EditIcon/>}
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Grid>
-                                                {!comparableEditMode[i] && (<>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: '1em' }}>
+                    <Tabs value={selectedTab} onChange={(ev, val) => setSelectedTab(val!)}>
+                        {tabs.map(tab => (
+                            <Tab label={tab} value={tab}/>
+                        ))}
+                    </Tabs>
+                </Box>
+                {selectedTab === 'Metric Definitions' && (<>
+                    <TableContainer>
+                        <Table size="small" stickyHeader>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Metric Name</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell>Relative Importance</TableCell>
+                                    <TableCell>Interpretation</TableCell>
+                                    <TableCell>Actions</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {metrics!.map((metric, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell style={{ minWidth: '12em' }}>
+                                            <TextField
+                                                size="small"
+                                                value={metric.name}
+                                                onChange={e => patchMetric(i, { name: e.target.value })}/>
+                                        </TableCell>
+                                        <TableCell>
+                                            <TextField
+                                                size="small"
+                                                select
+                                                value={metric.type}
+                                                onChange={e => updateMetricType(i, e.target.value as any)}>
+                                                {(Object.keys(typeLabels) as Array<keyof typeof typeLabels>).map(key => (
+                                                    <MenuItem key={key} value={key}>{typeLabels[key]}</MenuItem>
+                                                ))}
+                                            </TextField>
+                                        </TableCell>
+                                        <TableCell>
+                                            <TextField
+                                                size="small"
+                                                value={metric.relativeImportance}
+                                                onChange={e => patchMetric(i, { relativeImportance: parseFloat(e.target.value) })}
+                                                InputProps={{ type: 'number' }}/>
+                                        </TableCell>
+                                        <TableCell>
+                                            {metric.type === 'boolean' ? (
+                                                <FormControlLabel label="True is better" control={
+                                                    <Checkbox checked={metric.trueIsBetter} onChange={e => patchMetric(i, { trueIsBetter: e.target.checked })}/>
+                                                }/>
+                                            ) : metric.type === 'numeric' ? (
+                                                <FormControlLabel label="Higher is better" control={
+                                                    <Checkbox checked={metric.higherIsBetter} onChange={e => patchMetric(i, { higherIsBetter: e.target.checked })}/>
+                                                }/>
+                                            ) : (
+                                                'N/A'
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Tooltip title="Delete">
+                                                <IconButton onClick={() => deleteMetric(i)}>
+                                                    <DeleteIcon/>
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Move up"><span>
+                                                <IconButton disabled={i === 0} onClick={() => moveMetric(i, -1)}>
+                                                    <ArrowUpwardIcon/>
+                                                </IconButton>
+                                            </span></Tooltip>
+                                            <Tooltip title="Move down"><span>
+                                                <IconButton disabled={i === metrics!.length - 1} onClick={() => moveMetric(i, 1)}>
+                                                    <ArrowDownwardIcon/>
+                                                </IconButton>
+                                            </span></Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    <Button style={{ marginTop: '1em' }} onClick={addMetric}>
+                        New Metric
+                    </Button>
+                </>)}
+                {selectedTab === 'Data Entry' && (
+                    <TableContainer>
+                        <Table size="small" stickyHeader>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell></TableCell>
+                                    {comparables!.map((comparable, i) => (
+                                        <TableCell key={i}>
+                                            <Grid container spacing={1} flexDirection="column">
+                                                <Grid item container alignItems="center">
                                                     <Grid item>
-                                                        <Tooltip title="Move left"><span>
-                                                            <IconButton size="small" disabled={i === 0} onClick={() => moveComparable(i, -1)}>
-                                                                <ArrowBackIcon/>
-                                                            </IconButton>
-                                                        </span></Tooltip>
+                                                        {!comparableEditMode[i] ? (
+                                                            <a href={comparable.url} target="_blank">
+                                                                <Typography fontWeight="bold">
+                                                                    {comparable.name}
+                                                                </Typography>
+                                                            </a>
+                                                        ) : (
+                                                            <TextField
+                                                                size="small"
+                                                                label="Name"
+                                                                value={comparable.name}
+                                                                onChange={e => patchComparable(i, { name: e.target.value })}/>
+                                                        )}
                                                     </Grid>
                                                     <Grid item>
-                                                        <Tooltip title="Move right"><span>
-                                                            <IconButton size="small" disabled={i === comparables!.length - 1} onClick={() => moveComparable(i, 1)}>
-                                                                <ArrowForwardIcon/>
-                                                            </IconButton>
-                                                        </span></Tooltip>
-                                                    </Grid>
-                                                    <Grid item>
-                                                        <Tooltip title="Delete" onClick={() => deleteComparable(i)}>
-                                                            <IconButton size="small">
-                                                                <DeleteIcon/>
+                                                        <Tooltip title={comparableEditMode[i] ? 'Done editing' : 'Edit'}>
+                                                            <IconButton size="small" onClick={() => patchComparableEditMode(i, !comparableEditMode[i])}>
+                                                                {comparableEditMode[i] ? <CheckIcon/> : <EditIcon/>}
                                                             </IconButton>
                                                         </Tooltip>
                                                     </Grid>
-                                                </>)}
+                                                    {!comparableEditMode[i] && (<>
+                                                        <Grid item>
+                                                            <Tooltip title="Move left"><span>
+                                                                <IconButton size="small" disabled={i === 0} onClick={() => moveComparable(i, -1)}>
+                                                                    <ArrowBackIcon/>
+                                                                </IconButton>
+                                                            </span></Tooltip>
+                                                        </Grid>
+                                                        <Grid item>
+                                                            <Tooltip title="Move right"><span>
+                                                                <IconButton size="small" disabled={i === comparables!.length - 1} onClick={() => moveComparable(i, 1)}>
+                                                                    <ArrowForwardIcon/>
+                                                                </IconButton>
+                                                            </span></Tooltip>
+                                                        </Grid>
+                                                        <Grid item>
+                                                            <Tooltip title="Delete" onClick={() => deleteComparable(i)}>
+                                                                <IconButton size="small">
+                                                                    <DeleteIcon/>
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </Grid>
+                                                    </>)}
+                                                </Grid>
+                                                {comparableEditMode[i] && (
+                                                    <Grid item container spacing={1}>
+                                                        <Grid item>
+                                                            <TextField
+                                                                size="small"
+                                                                label="Image URL"
+                                                                value={comparable.imageUrl ?? ''}
+                                                                onChange={e => patchComparable(i, { imageUrl: e.target.value || undefined })}/>
+                                                        </Grid>
+                                                        <Grid item>
+                                                            <TextField
+                                                                size="small"
+                                                                label="More info URL"
+                                                                value={comparable.url ?? ''}
+                                                                onChange={e => patchComparable(i, { url: e.target.value || undefined })}/>
+                                                        </Grid>
+                                                    </Grid>
+                                                )}
+                                                {!comparableEditMode[i] && comparable.imageUrl && (
+                                                    <Grid item>
+                                                        <a href={comparable.url} target="_blank">
+                                                            <img src={comparable.imageUrl} height="180px"/>
+                                                        </a>
+                                                    </Grid>
+                                                )}
                                             </Grid>
-                                            {comparableEditMode[i] && (
-                                                <Grid item container spacing={1}>
-                                                    <Grid item>
-                                                        <TextField
-                                                            size="small"
-                                                            label="Image URL"
-                                                            value={comparable.imageUrl ?? ''}
-                                                            onChange={e => patchComparable(i, { imageUrl: e.target.value || undefined })}/>
-                                                    </Grid>
-                                                    <Grid item>
-                                                        <TextField
-                                                            size="small"
-                                                            label="More info URL"
-                                                            value={comparable.url ?? ''}
-                                                            onChange={e => patchComparable(i, { url: e.target.value || undefined })}/>
-                                                    </Grid>
-                                                </Grid>
-                                            )}
-                                            {!comparableEditMode[i] && comparable.imageUrl && (
-                                                <Grid item>
-                                                    <a href={comparable.url} target="_blank">
-                                                        <img src={comparable.imageUrl} width="200px"/>
-                                                    </a>
-                                                </Grid>
-                                            )}
-                                        </Grid>
-                                    </TableCell>
-                                ))}
-                                <TableCell>
-                                    <Button onClick={addComparable}>
-                                        New column
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {metrics!.map((metric, metricIndex) => (
-                                <TableRow key={metricIndex}>
-                                    <TableCell align="right">
-                                        <Typography fontWeight={500}>{metric.name}</Typography>
-                                    </TableCell>
-                                    {comparables!.map((_, comparableIndex) => (
-                                        <TableCell key={comparableIndex}>
-                                            <MetricRating
-                                                type={metric.type}
-                                                value={metricData![comparableIndex][metricIndex]}
-                                                onChange={newValue => updateMetricData(comparableIndex, metricIndex, newValue)}/>
                                         </TableCell>
                                     ))}
+                                    <TableCell>
+                                        <Button onClick={addComparable}>
+                                            New column
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                <Accordion expanded={metricsTableOpen} onChange={(_, newState) => setMetricsTableOpen(newState)}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon/>}>
-                        <Typography>Metric Definitions ({metrics!.length})</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                        <TableContainer>
-                            <Table size="small" stickyHeader>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Metric Name</TableCell>
-                                        <TableCell>Type</TableCell>
-                                        <TableCell>Relative Importance</TableCell>
-                                        <TableCell>Interpretation</TableCell>
-                                        <TableCell>Actions</TableCell>
+                            </TableHead>
+                            <TableBody>
+                                {metrics!.map((metric, metricIndex) => (
+                                    <TableRow key={metricIndex}>
+                                        <TableCell align="right">
+                                            <Typography fontWeight={500}>{metric.name}</Typography>
+                                        </TableCell>
+                                        {comparables!.map((_, comparableIndex) => (
+                                            <TableCell key={comparableIndex}>
+                                                <MetricRating
+                                                    type={metric.type}
+                                                    value={metricData![comparableIndex][metricIndex]}
+                                                    onChange={newValue => updateMetricData(comparableIndex, metricIndex, newValue)}/>
+                                            </TableCell>
+                                        ))}
                                     </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {metrics!.map((metric, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell style={{ minWidth: '12em' }}>
-                                                <TextField
-                                                    size="small"
-                                                    value={metric.name}
-                                                    onChange={e => patchMetric(i, { name: e.target.value })}/>
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    size="small"
-                                                    select
-                                                    value={metric.type}
-                                                    onChange={e => updateMetricType(i, e.target.value as any)}>
-                                                    {(Object.keys(typeLabels) as Array<keyof typeof typeLabels>).map(key => (
-                                                        <MenuItem key={key} value={key}>{typeLabels[key]}</MenuItem>
-                                                    ))}
-                                                </TextField>
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    size="small"
-                                                    value={metric.relativeImportance}
-                                                    onChange={e => patchMetric(i, { relativeImportance: parseFloat(e.target.value) })}
-                                                    InputProps={{ type: 'number' }}/>
-                                            </TableCell>
-                                            <TableCell>
-                                                {metric.type === 'boolean' ? (
-                                                    <FormControlLabel label="True is better" control={
-                                                        <Checkbox checked={metric.trueIsBetter} onChange={e => patchMetric(i, { trueIsBetter: e.target.checked })}/>
-                                                    }/>
-                                                ) : metric.type === 'numeric' ? (
-                                                    <FormControlLabel label="Higher is better" control={
-                                                        <Checkbox checked={metric.higherIsBetter} onChange={e => patchMetric(i, { higherIsBetter: e.target.checked })}/>
-                                                    }/>
-                                                ) : (
-                                                    'N/A'
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Tooltip title="Delete">
-                                                    <IconButton onClick={() => deleteMetric(i)}>
-                                                        <DeleteIcon/>
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Move up"><span>
-                                                    <IconButton disabled={i === 0} onClick={() => moveMetric(i, -1)}>
-                                                        <ArrowUpwardIcon/>
-                                                    </IconButton>
-                                                </span></Tooltip>
-                                                <Tooltip title="Move down"><span>
-                                                    <IconButton disabled={i === metrics!.length - 1} onClick={() => moveMetric(i, 1)}>
-                                                        <ArrowDownwardIcon/>
-                                                    </IconButton>
-                                                </span></Tooltip>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                        <Button style={{ marginTop: '1em' }} onClick={addMetric}>
-                            New Metric
-                        </Button>
-                    </AccordionDetails>
-                </Accordion>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                )}
+                {selectedTab === 'Results View' && (
+                    <Grid container spacing={2} flexDirection="column">
+                        {results.map(([comparable, score], i) => (
+                            <Grid item key={i}>
+                                <Card>
+                                    <CardMedia
+                                        component="img"
+                                        height="200"
+                                        image={comparable.imageUrl}/>
+                                    <CardContent sx={{ flex: '1 0 auto' }}>
+                                        <Typography component="div" variant="h4">
+                                            #{i + 1} {comparable.name}
+                                        </Typography>
+                                        <Typography variant="subtitle1" color="text.secondary" component="div">
+                                            Overall Score: {Math.round(score * 1000)}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        ))}
+                    </Grid>
+                )}
             </Container>
         </AppProviders>
     );
