@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Box, Button, Card, CardContent, CardMedia, Checkbox, Container, CssBaseline, FormControlLabel, Grid, IconButton, MenuItem, Paper, Rating, SxProps, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Tooltip, Typography } from '@mui/material';
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Card, CardContent, CardMedia, Checkbox, Container, CssBaseline, FormControlLabel, Grid, IconButton, MenuItem, Paper, Rating, SxProps, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Tooltip, Typography } from '@mui/material';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
@@ -8,13 +8,15 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { StrictMode } from 'react';
 import { useLocalStorage } from 'react-use';
 
-const tabs = ["Metric Definitions", "Data Entry", "Results View"] as const;
+const tabs = ["Project", "Metric Definitions", "Data Entry", "Results View"] as const;
 
 export default function App() {
-    const [selectedTab, setSelectedTab] = useLocalStorage('tabState', tabs[0] as typeof tabs[number]);
+    const [selectedTab, setSelectedTab] = useLocalStorage('tabState', tabs[2] as typeof tabs[number]);
 
     const [comparables, setComparables] = useLocalStorage<Comparable[]>('comparables', [
         { name: 'Apartment 1' },
@@ -35,6 +37,21 @@ export default function App() {
         [1400, 760, true],
         [1200, 700, false],
     ]);
+
+    // manual JSON formatting because I'm picky
+    const projectExportString = useMemo(() => {
+        return `{
+    "comparables": [
+        ${comparables!.map(c => JSON.stringify(c)).join(',\n\t\t')}
+    ],
+    "metrics": [
+        ${metrics!.map(m => JSON.stringify(m)).join(',\n\t\t')}
+    ],
+    "metricData": [
+        ${metricData!.map(md => JSON.stringify(md)).join(',\n\t\t')}
+    ]
+}`.replace(/\t/g, '    ');
+    }, [comparables, metrics, metricData]);
 
     const results = useMemo<[Comparable, number][]>(() => {
         const scores = metricData!
@@ -66,6 +83,40 @@ export default function App() {
             .map((score, i) => [comparables![i], score] as [Comparable, number])
             .sort((a, b) => b[1] - a[1]);
     }, [comparables, metrics, metricData]);
+
+    function importProject() {
+        const overwrite = confirm('Abandon current project? Unsaved changes will be lost');
+        if (!overwrite) return;
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'application/json';
+        fileInput.click();
+        fileInput.onchange = () => {
+            fileInput.files![0].text().then(text => {
+                // FIXME: super basic validation probably won't cut it
+                const json = JSON.parse(text);
+                if (!Array.isArray(json.comparables))
+                    throw new Error('Imported JSON missing "comparables" array');
+                if (!Array.isArray(json.metrics))
+                    throw new Error('Imported JSON missing "metrics" array');
+                if (!Array.isArray(json.metricData))
+                    throw new Error('Imported JSON missing "metricData" array');
+                
+                setComparables(json.comparables);
+                setMetrics(json.metrics);
+                setMetricData(json.metricData);
+            });
+        };
+    }
+
+    function deleteProject() {
+        const del = confirm('Are you sure you want to delete the current project?');
+        if (!del) return;
+
+        localStorage.clear();
+        window.location.reload();
+    }
 
     function addComparable() {
         setComparables([...comparables!, { name: `Item ${comparables!.length + 1}` }]);
@@ -167,6 +218,33 @@ export default function App() {
                         ))}
                     </Tabs>
                 </Box>
+                {selectedTab === 'Project' && (
+                    <Grid container spacing={2} flexDirection="column">
+                        <Grid item container spacing={1}>
+                            <Grid item>
+                                <Button variant="outlined" startIcon={<UploadFileIcon/>} onClick={importProject}>
+                                    Import Project
+                                </Button>
+                            </Grid>
+                            <Grid item>
+                                <Button variant="outlined" startIcon={<FileDownloadIcon/>} onClick={() => downloadJson('comparison-project.json', projectExportString)}>
+                                    Export Project
+                                </Button>
+                            </Grid>
+                            <Grid item>
+                                <Button color="error" variant="outlined" startIcon={<DeleteIcon/>} onClick={deleteProject}>
+                                    Clear Project Data
+                                </Button>
+                            </Grid>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="h6">Project Data</Typography>
+                            <Box overflow="auto" bgcolor="#f5f5f5" padding="0.5em">
+                                <pre>{projectExportString}</pre>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                )}
                 {selectedTab === 'Metric Definitions' && (<>
                     <TableContainer>
                         <Table size="small" stickyHeader>
@@ -436,6 +514,14 @@ function MetricRating(props: { label: string, type: Metric['type'], value: Metri
             onChange={e => props.onChange(parseFloat(e.target.value))}
             InputProps={{ type: 'number' }}/>
     );
+}
+
+function downloadJson(name: string, data: string) {
+    const a = document.createElement('a');
+    const blob = new Blob([data], { type: 'application/json' })
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
 }
 
 function swap<T>(data: T[], i: number, direction: 1 | -1): T[] {
