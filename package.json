@@ -3,7 +3,10 @@
     "scripts": {
         "test": "tsc --noEmit",
         "dev": "esbuild src/index.tsx --servedir=src --bundle --inject:./react-shim.js",
-        "build": "rimraf dist && mkdir dist && cpy --flat src/index.html dist && esbuild src/index.tsx --bundle --minify --outdir=dist --inject:./react-shim.js"
+        "build:pre": "rimraf dist && mkdir dist && cpy --flat src/index.html dist",
+        "build:es": "esbuild src/index.tsx --bundle --minify --outdir=dist --inject:./react-shim.js --entry-names=[name]-[hash]",
+        "build:post": "node -e \"const fs=require('fs'); fs.readdir('./dist', null, (err, files) => {const indexName=files.find(f => f.startsWith('index') && f.endsWith('.js')); const htmlText=fs.readFileSync('./dist/index.html', 'utf8'); fs.writeFileSync('./dist/index.html', htmlText.replace('index.js', indexName)) });\"",
+        "build": "yarn build:pre && yarn build:es && yarn build:post"
     },
     "dependencies": {
         "@emotion/react": "^11.8.2",
